@@ -1,0 +1,48 @@
+name: 'Upload to Github Release'
+description: 'Uploads build artifact to Github Releases'
+author: 'Rei Hakurei <contact@bloom-juery.net>'
+inputs:
+  changelog:
+    description: Changelog path file.
+    default: CHANGELOG.md
+  files:
+    description: List of files to be passed into GitHub Releases.
+    required: true
+  tag:
+    description: Tag name for nightly release.
+    default: nightly
+  flag:
+    description: A flag to denote Nightly Build. Set it to a non-blank string to flag it.
+    default: ''
+runs:
+  using: composite
+  steps:
+    # Repository Nightlies
+    - name: Prerelease Remove
+      if: ${{ !startswith(github.ref_name, 'nightly/') && inputs.flag }}
+      uses: dev-drprasad/delete-tag-and-release@v0.2.1
+      continue-on-error: true
+      with:
+        delete_release: true
+        tag_name: ${{ inputs.tag }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Prerelease Update
+      if: ${{ !startswith(github.ref_name, 'nightly/') && inputs.flag }}
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Nightly Build
+        body_path: ${{ github.workspace }}/${{ inputs.changelog }}
+        tag_name: ${{ inputs.tag }}
+        target_commitish: ${{ github.sha }}
+        draft: false
+        prerelease: true
+        files: ${{ inputs.files }}
+
+    # Tagged Release
+    - name: Upload Release
+      if: startswith(github.ref_name, 'nightly/')
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: ${{ github.workspace }}/${{ inputs.changelog }}
+        files: ${{ inputs.files }}

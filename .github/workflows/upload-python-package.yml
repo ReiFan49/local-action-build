@@ -1,0 +1,86 @@
+name: Publish Python Package to Github Release
+on:
+  workflow_call:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        python: [ '3.11' ]
+        include:
+        - public-release: ${{ startsWith(github.ref, 'refs/tags/') }}
+
+    name: Package Builder
+    runs-on: ubuntu-latest
+    if: ${{ !(github.ref_name == 'nightly' || startswith(github.ref_name, 'nightly/')) }}
+    outputs: {}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        cache: pip
+    - name: Install Dependencies
+      run:  pip install -r requirements.txt
+    - name: Install Build Dependencies
+      run:  |
+        pip install -r requirements.build.txt
+        # https://github.com/svpcom/wfb-ng/issues/120#issuecomment-1213182204
+        PACKAGE_DIR=$(pip show stdeb | grep ^Location | sed 's/^Location:\s*//')
+        sed -i -r 's/\s--install-layout=deb//' ${PACKAGE_DIR}/stdeb/util.py
+
+        sudo apt update
+        sudo apt install -y build-essential python3-all debhelper dh-python
+
+    - name: Check Prerelease Validity
+      id: check-pre
+      env:
+        REF_NAME: ${{ github.ref_name }}
+        REF_TYPE: ${{ github.ref_type }}
+      run:  |
+        NIGHTLY_FLAG=
+        [[ ${REF_TYPE} = branch ]] && [[ ${REF_NAME} =~ (master|^gha/) ]] && NIGHTLY_FLAG=1
+
+        # check tag times
+        # nightly is not allowed if tag is deployed together
+        TAG_TIMES=$(git tag --format='%(creatordate:unix)')
+        COMMIT_TIME=$(git log --date=unix --format='%cd' HEAD~1..)
+        TAG_PATTERNS=
+        for tag_time in ${TAG_TIMES}; do
+          TAG_PATTERNS="${TAG_PATTERNS} -e ${tag_time}"
+        done
+        [[ -n ${TAG_PATTERNS} ]] && TAG_PATTERNS="-F ${TAG_PATTERNS}"
+        if [[ -n ${TAG_PATTERNS} ]]; then
+          (echo "${COMMIT_TIME}" | grep -q ${TAG_PATTERNS}) && \
+            NIGHTLY_FLAG=
+        fi
+
+        echo "can-nightly=${NIGHTLY_FLAG}" >> "${GITHUB_OUTPUT}"
+    - name: Obtain Version
+      id: version
+      run:  |
+        VERSION=$(python3 -m setuptools_scm)
+        echo "value=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+    - name: Build Debian Package
+      run:  python3 setup.py --command-packages=stdeb.command bdist_deb
+    - name: Generate Changelog
+      if: vars.CHANGELOG_SCRIPT_URL
+      env:
+        CHANGELOG_SCRIPT_URL: ${{ vars.CHANGELOG_SCRIPT_URL }}
+      run: |
+        curl -sL "${CHANGELOG_SCRIPT_URL}" | bash -s - >CHANGELOG.md
+
+    - uses: ReiFan49/local-action-build/upload-python-deb-artifact@master
+      if: ${{ !matrix.public-release && !steps.check-pre.outputs.can-nightly }}
+      with:
+        version: ${{ steps.version.outputs.value }}
+    - uses: ReiFan49/local-action-build/upload-release@master
+      with:
+        files: |
+          deb_dist/*.deb
+          dist/*.tar.gz
+        flag: ${{ steps.check-pre.outputs.can-nightly }}
+

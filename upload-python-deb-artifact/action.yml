@@ -1,0 +1,20 @@
+name: 'Upload Python and Deb Artifact'
+description: 'Uploads python and deb package of specific library to the action artifacts.'
+author: 'Rei Hakurei <contact@bloom-juery.net>'
+inputs:
+  version:
+    description: Package Version.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Upload Artifact (Deb Package)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Debian Package ${{ inputs.version }}
+        path: deb_dist/*.deb
+    - name: Upload Artifact (Python Package)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Python Package ${{ inputs.version }}
+        path: dist/*.tar.gz
