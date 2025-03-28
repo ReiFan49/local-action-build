@@ -15,6 +15,7 @@ jobs:
     if: ${{ !(github.ref_name == 'nightly' || startswith(github.ref_name, 'nightly/')) }}
     outputs: {}
     steps:
+    # Initialization
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
@@ -23,10 +24,18 @@ jobs:
         python-version: ${{ matrix.python }}
         cache: pip
     - name: Install Dependencies
-      run:  pip install -r requirements.txt
+      run:  |
+        [[ ! -f requirements.txt ]] && exit
+
+        pip install -r requirements.txt
     - name: Install Build Dependencies
       run:  |
-        pip install -r requirements.build.txt
+        if [[ ! -f requirements.build.txt ]]; then
+          pip install 'setuptools >= 64.0' 'setuptools_scm >= 8' 'stdeb >= 0.10.0'
+        else
+          pip install -r requirements.build.txt
+        fi
+
         # https://github.com/svpcom/wfb-ng/issues/120#issuecomment-1213182204
         PACKAGE_DIR=$(pip show stdeb | grep ^Location | sed 's/^Location:\s*//')
         sed -i -r 's/\s--install-layout=deb//' ${PACKAGE_DIR}/stdeb/util.py
