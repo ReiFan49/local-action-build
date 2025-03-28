@@ -79,6 +79,7 @@ jobs:
         version: ${{ steps.version.outputs.value }}
     - uses: ReiFan49/local-action-build/upload-release@master
       with:
+        token: ${{ secrets.GITHUB_TOKEN }}
         files: |
           deb_dist/*.deb
           dist/*.tar.gz

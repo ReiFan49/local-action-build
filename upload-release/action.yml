@@ -2,6 +2,9 @@ name: 'Upload to Github Release'
 description: 'Uploads build artifact to Github Releases'
 author: 'Rei Hakurei <contact@bloom-juery.net>'
 inputs:
+  token:
+    description: Token provided for the Repository Access.
+    required: true
   changelog:
     description: Changelog path file.
     default: CHANGELOG.md
@@ -26,7 +29,7 @@ runs:
         delete_release: true
         tag_name: ${{ inputs.tag }}
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.token }}
     - name: Prerelease Update
       if: ${{ !startswith(github.ref_name, 'nightly/') && inputs.flag }}
       uses: softprops/action-gh-release@v1
