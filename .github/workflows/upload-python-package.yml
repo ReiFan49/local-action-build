@@ -23,14 +23,21 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
         cache: pip
-    - name: Install Dependencies
-      run:  |
-        [[ ! -f requirements.txt ]] && exit
+    - name: Check Dependencies File
+      id: check-dep
+      run: |
+        HAVE_DEPENDENCIES=
+        [[ -f requirements.txt ]] && HAVE_DEPENDENCIES=1
 
-        pip install -r requirements.txt
+        echo "dep-file=${HAVE_DEPENDENCIES}" >> "${GITHUB_OUTPUT}"
+    - name: Install Dependencies
+      if: steps.check-dep.outputs.dep-file
+      run: pip install -r requirements.txt
     - name: Install Build Dependencies
       run:  |
         if [[ ! -f requirements.build.txt ]]; then
+          # Install standardized build requirement if unspecified.
+          # Should move this to gist?
           pip install 'setuptools >= 64.0' 'setuptools_scm >= 8' 'stdeb >= 0.10.0'
         else
           pip install -r requirements.build.txt
@@ -93,4 +100,3 @@ jobs:
           deb_dist/*.deb
           dist/*.tar.gz
         flag: ${{ steps.check-pre.outputs.can-nightly }}
-
