@@ -22,7 +22,7 @@ runs:
   steps:
     # Repository Nightlies
     - name: Prerelease Remove
-      if: ${{ !startswith(github.ref_name, 'nightly/') && inputs.flag }}
+      if: ${{ !startsWith(github.ref, 'refs/tags/') && inputs.flag }}
       uses: dev-drprasad/delete-tag-and-release@v0.2.1
       continue-on-error: true
       with:
@@ -31,7 +31,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
     - name: Prerelease Update
-      if: ${{ !startswith(github.ref_name, 'nightly/') && inputs.flag }}
+      if: ${{ !startsWith(github.ref, 'refs/tags/') && inputs.flag }}
       uses: softprops/action-gh-release@v1
       with:
         name: Nightly Build
@@ -44,7 +44,7 @@ runs:
 
     # Tagged Release
     - name: Upload Release
-      if: startswith(github.ref_name, 'nightly/')
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
         body_path: ${{ github.workspace }}/${{ inputs.changelog }}
