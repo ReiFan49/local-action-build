@@ -1,0 +1,28 @@
+name: Obtain Changes of Ruby Code
+on:
+  workflow_call:
+    outputs:
+      code:
+        description: 'Returns a string-boolean of the check on code changes.'
+        value: ${{ jobs.changes.outputs.code }}
+      lint:
+        description: 'Returns a string-boolean of the check on linter changes.'
+        value: ${{ jobs.changes.outputs.lint }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    name: Detect
+    outputs:
+      code: ${{ steps.filter.outputs.ruby-code }}
+      lint: ${{ steps.filter.outputs.ruby-lint }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          ruby-code:
+          - 'lib/**.rb'
+          ruby-lint:
+          - '.rubocop.yml'

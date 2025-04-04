@@ -1,0 +1,68 @@
+name: Assorted Ruby Workflows
+on:
+  workflow_call:
+    inputs:
+      update-doc:
+        description: 'Flag to perform update on public ruby gem repository.'
+        type: boolean
+      code-lint:
+        description: 'Flag to perform lint on the repository.'
+        type: boolean
+      code-test:
+        description: 'Flag to perform test on the repository.'
+        type: boolean
+      ruby-versions:
+        description: 'List of Ruby versions to use.'
+        type: string
+    secrets:
+      trigger-token:
+        description: 'A token passed to perform repostiory dispatch workflow.'
+        required: true
+
+jobs:
+  changes:
+    name: Fetch Changes
+    uses: ./.github/workflows/fetch-changes-ruby.yml
+
+  update-doc-trigger:
+    needs: changes
+    if: |
+      needs.changes.outputs.code == 'true' &&
+      inputs.update-doc &&
+      github.event_name == 'push' &&
+      github.ref_type == 'branch' &&
+      github.ref_name == 'master'
+    runs-on: ubuntu-latest
+    name: Send Publish Trigger
+    steps:
+    - name: Send update-gem Dispatch
+      run: |
+        curl -X POST -u "${{ github.actor }}:${{ secrets.trigger-token }}" \
+          -H "Accept: application/vnd.github.everest-preview+json" \
+          -H "Content-Type: application/json" \
+          https://api.github.com/repos/ReiFan49/bloom-ruby-doc/dispatches \
+          --data '{"event_type": "update-gem"}'
+
+  linter:
+    needs: changes
+    if: |
+      needs.changes.outputs.code == 'true' &&
+      needs.changes.outputs.lint == 'true' &&
+      inputs.code-lint &&
+      inputs.ruby-versions
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby-version: ${{ fromJSON(inputs.ruby-versions) }}
+    name: Lint Source Code
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: true
+        ruby-version: ${{ matrix.ruby-version }}
+    - name: Install Dependencies
+      run: bundle install
+    - name: Rubocop Lint
+      run: bundle exec rubocop --display-only-fail-level-offenses -f g
