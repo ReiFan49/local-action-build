@@ -61,6 +61,7 @@ jobs:
     strategy:
       matrix:
         ruby-version: ${{ fromJSON(inputs.ruby-versions) }}
+      fail-fast: false
     name: Lint Source Code
     steps:
     - uses: actions/checkout@v4
