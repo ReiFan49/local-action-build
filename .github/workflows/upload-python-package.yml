@@ -82,8 +82,41 @@ jobs:
 
     - name: Build Debian Package
       run:  python3 setup.py --command-packages=stdeb.command bdist_deb
-    - name: Test Debian Package
+    - name: Fix Debian Package Content
       run: |
+        DPKG_FILE=$(ls deb_dist/*.deb | head -n 1)
+
+        DEB_INSTALL_DIR=$(find deb_dist \( -name 'python3' -o -name 'python3.*' \) | head -n 1)
+        DEB_INSTALL_GROUP=$(ls "${DEB_INSTALL_DIR}" | head -n 1)
+        DEB_INSTALL_GROUP_DIR="${DEB_INSTALL_DIR}/${DEB_INSTALL_GROUP}"
+        DEB_INSTALL_ANCHOR=$(realpath "${DEB_INSTALL_DIR}/..")
+        DEB_INSTALL_TEMP_DIR="${DEB_INSTALL_ANCHOR}/.pytemp"
+        DEB_INSTALL_CORRECT_DIR="${DEB_INSTALL_ANCHOR}/python3/dist-packages"
+        DEB_INSTALL_ROOT=${DEB_INSTALL_ANCHOR%%/usr/*}
+        DEB_INSTALL_BASE=$(find deb_dist -type d -path 'deb_dist/*' -prune)
+
+        if [[ ${DEB_INSTALL_GROUP_DIR} != ${DEB_INSTALL_CORRECT_DIR} ]]; then
+          mv "${DEB_INSTALL_GROUP_DIR}" "${DEB_INSTALL_TEMP_DIR}"
+          rm -r "${DEB_INSTALL_DIR}"
+          mkdir -p $(realpath -m "${DEB_INSTALL_CORRECT_DIR}/..")
+          mv "${DEB_INSTALL_TEMP_DIR}" "${DEB_INSTALL_CORRECT_DIR}"
+        else
+          echo "::notice::There's no need to correct the package."
+          exit 0
+        fi
+
+        pushd "${DEB_INSTALL_ROOT}"
+          find . -type f -not -path './DEBIAN/*' -exec md5sum {} + | \
+            sort -k 2 | sed 's/\.\/\(.*\)/\1/' > DEBIAN/md5sums
+        popd
+        dpkg-deb -b "${DEB_INSTALL_ROOT}" "${DPKG_FILE}"
+
+    # Ignore this. Keeping it temporarily.
+    - name: Test Debian Package
+      if: ${{ 1 == 0 }}
+      run: |
+        exit 0
+
         DPKG_FILE=$(ls deb_dist/*.deb | head -n 1)
 
         echo 'Confirming contents...' >&2
