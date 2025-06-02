@@ -82,6 +82,22 @@ jobs:
 
     - name: Build Debian Package
       run:  python3 setup.py --command-packages=stdeb.command bdist_deb
+    - name: Test Debian Package
+      run: |
+        sudo dpkg -i deb_dist/*.deb
+
+        if (pip freeze | grep -q tomli); then
+          USE_TOMLI=1
+        else
+          USE_TOMLI=
+        fi
+        TOMLIB_NAME=tomllib
+        [[ -n ${USE_TOMLI} ]] && TOMLIB_NAME=tomli
+
+        PROJECT_NAME=$( \
+          python3 -c "import ${TOMLIB_NAME}; print(${TOMLIB_NAME}.load(open('pyproject.toml', 'rb'))['project']['name'])" \
+        )
+        pip freeze | grep -qE "^${PROJECT_NAME}=="
     - name: Generate Changelog
       if: vars.CHANGELOG_SCRIPT_URL
       env:
