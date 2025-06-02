@@ -84,11 +84,19 @@ jobs:
       run:  python3 setup.py --command-packages=stdeb.command bdist_deb
     - name: Test Debian Package
       run: |
-        sudo dpkg -i deb_dist/*.deb
+        DPKG_FILE=$(ls deb_dist/*.deb | head -n 1)
+
+        echo 'Confirming contents...' >&2
+        dpkg -c "${DPKG_FILE}"
+
+        echo 'Installing the package locally...' >&2
+        sudo dpkg -i "${DPKG_FILE}"
 
         if (pip freeze | grep -q tomli); then
+          echo '::notice::use legacy tomli package'
           USE_TOMLI=1
         else
+          echo '::notice::use provided tomllib package'
           USE_TOMLI=
         fi
         TOMLIB_NAME=tomllib
@@ -97,7 +105,10 @@ jobs:
         PROJECT_NAME=$( \
           python3 -c "import ${TOMLIB_NAME}; print(${TOMLIB_NAME}.load(open('pyproject.toml', 'rb'))['project']['name'])" \
         )
-        pip freeze | grep -qE "^${PROJECT_NAME}=="
+        if ! (pip freeze | grep -qE "^${PROJECT_NAME}=="); then
+          echo '::error title=DEB Package::Does not contain' ${PROJECT_NAME} 'package'
+          exit 1
+        fi
     - name: Generate Changelog
       if: vars.CHANGELOG_SCRIPT_URL
       env:
