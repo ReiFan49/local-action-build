@@ -1,0 +1,62 @@
+name: '[Meta] Action Filename Consistency'
+on:
+  push:
+  workflow_call:
+    inputs:
+      extension:
+        description: 'Preferred YAML extension. NO LEADING DOT.'
+        type: string
+        default: 'yml'
+
+jobs:
+  consistency-check:
+    name: Consistency Check
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+    - name: Input Validation
+      id: input
+      env:
+        EXT_INPUT: "${{ inputs.extension }}"
+      run: |
+        extension=yml
+        if [[ -n "${EXT_INPUT}" ]]; then
+          if [[ "${EXT_INPUT}" = yml ]]; then
+            :
+          elif [[ "${EXT_INPUT}" = yaml ]]; then
+            :
+          else
+            echo "::error title=Invalid Input::extension only accepts yml or yaml."
+            exit 2
+          fi
+
+          extension="${EXT_INPUT}"
+        fi
+
+        echo "extension=${extension}" >> "${GITHUB_OUTPUT}"
+    - name: Filename Check
+      run: |
+        shopt -s globstar
+
+        SOURCES=()
+        if [[ '${{ github.event_type }}' = 'push' ]]; then
+          SOURCES+=(.)
+        fi
+        SOURCES+=(.github/workflows)
+        FILES=($(find "${SOURCES[@]}" -name '*.yml' -o -name '*.yaml'))
+
+        IS_FAIL=
+        need_ext="${{ steps.input.outputs.extension }}"
+        for workflow in "${FILES[@]}"; do
+          [[ ! -f "${workflow}" ]] && continue
+
+          ext=${workflow##*.}
+          [[ "${ext}" = "${need_ext}" ]] && continue
+
+          echo "::error title=Extension Inconsistent::\`${workflow}\` have extension of \`${ext}\`, expected to have \`${need_ext}\`"
+          IS_FAIL=1
+        done
+
+        [[ -z "${IS_FAIL}" ]] || exit 1
+        :
